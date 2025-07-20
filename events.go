@@ -2,6 +2,7 @@ package gsm
 
 import (
 	"fmt"
+	"github.com/tarm/serial"
 	"strconv"
 	"strings"
 	"time"
@@ -45,8 +46,25 @@ func (m *Modem) StartEventListener() error {
 		return fmt.Errorf("failed to enable network registration updates: %w", err)
 	}
 
-	// Запускаем горутину для чтения событий
-	go m.eventListenerLoop()
+	// Создаем отдельное соединение для событий с коротким таймаутом
+	eventConfig := &serial.Config{
+		Name:        m.config.Name,
+		Baud:        m.config.Baud,
+		ReadTimeout: time.Millisecond * 100,
+	}
+
+	eventPort, err := serial.OpenPort(eventConfig)
+	if err != nil {
+		// Используем основной порт если не можем открыть отдельный
+		go m.eventListenerLoop()
+	} else {
+		// Закроем при остановке
+		go func() {
+			<-m.stopEventsCh
+			eventPort.Close()
+		}()
+		go m.eventListenerLoopWithPort(eventPort)
+	}
 
 	return nil
 }
@@ -60,31 +78,49 @@ func (m *Modem) StopEventListener() {
 
 // eventListenerLoop основной цикл обработки событий
 func (m *Modem) eventListenerLoop() {
+	buf := make([]byte, 1024)
+	var lineBuffer strings.Builder
+
 	for {
 		select {
 		case <-m.stopEventsCh:
 			return
 		default:
-			// Читаем данные с небольшим таймаутом
-			m.port.SetReadTimeout(time.Millisecond * 100)
-			line, err := m.reader.ReadString('\n')
+			// Читаем данные (с таймаутом из конфига)
+			n, err := m.port.Read(buf)
 			if err != nil {
+				// Небольшая пауза при ошибке чтения
+				time.Sleep(100 * time.Millisecond)
 				continue
 			}
 
-			line = strings.TrimSpace(line)
-			if line == "" {
-				continue
-			}
+			if n > 0 {
+				// Добавляем прочитанные данные в буфер
+				lineBuffer.Write(buf[:n])
 
-			// Обрабатываем различные типы уведомлений
-			event := m.parseEvent(line)
-			if event != nil {
-				select {
-				case m.eventChan <- *event:
-				default:
-					// Канал полон, пропускаем событие
+				// Проверяем на наличие полных строк
+				content := lineBuffer.String()
+				lines := strings.Split(content, "\n")
+
+				// Обрабатываем все полные строки
+				for i := 0; i < len(lines)-1; i++ {
+					line := strings.TrimSpace(lines[i])
+					if line != "" {
+						// Обрабатываем событие
+						event := m.parseEvent(line)
+						if event != nil {
+							select {
+							case m.eventChan <- *event:
+							default:
+								// Канал полон, пропускаем событие
+							}
+						}
+					}
 				}
+
+				// Оставляем неполную строку в буфере
+				lineBuffer.Reset()
+				lineBuffer.WriteString(lines[len(lines)-1])
 			}
 		}
 	}

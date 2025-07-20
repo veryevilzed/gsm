@@ -1,7 +1,6 @@
 package gsm
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
 	"runtime"
@@ -19,7 +18,6 @@ type Modem struct {
 	mu           sync.Mutex
 	eventChan    chan Event
 	stopEventsCh chan struct{}
-	reader       *bufio.Reader
 }
 
 // ModemInfo содержит информацию о модеме
@@ -99,16 +97,17 @@ func tryOpenModem(port string) *ModemInfo {
 	}
 	defer serialPort.Close()
 
-	// Создаем временный модем для проверки
-	m := &Modem{
-		port:   serialPort,
-		config: config,
-		reader: bufio.NewReader(serialPort),
+	// Проверяем, отвечает ли устройство на AT команды
+	serialPort.Flush()
+	_, err = serialPort.Write([]byte("AT\r\n"))
+	if err != nil {
+		return nil
 	}
 
-	// Проверяем, отвечает ли устройство на AT команды
-	resp, err := m.sendCommand("AT", time.Second)
-	if err != nil || !strings.Contains(resp, "OK") {
+	// Читаем ответ
+	buf := make([]byte, 128)
+	n, err := serialPort.Read(buf)
+	if err != nil || n == 0 || !strings.Contains(string(buf[:n]), "OK") {
 		return nil
 	}
 
@@ -116,18 +115,32 @@ func tryOpenModem(port string) *ModemInfo {
 		Port: port,
 	}
 
+	// Вспомогательная функция для отправки команд
+	sendCmd := func(cmd string) string {
+		serialPort.Flush()
+		serialPort.Write([]byte(cmd + "\r\n"))
+		time.Sleep(100 * time.Millisecond)
+
+		buf := make([]byte, 256)
+		n, _ := serialPort.Read(buf)
+		if n > 0 {
+			return string(buf[:n])
+		}
+		return ""
+	}
+
 	// Получаем информацию о производителе
-	if resp, err := m.sendCommand("AT+CGMI", time.Second); err == nil {
+	if resp := sendCmd("AT+CGMI"); resp != "" {
 		info.Manufacturer = extractResponse(resp)
 	}
 
 	// Получаем модель
-	if resp, err := m.sendCommand("AT+CGMM", time.Second); err == nil {
+	if resp := sendCmd("AT+CGMM"); resp != "" {
 		info.Model = extractResponse(resp)
 	}
 
 	// Получаем IMEI
-	if resp, err := m.sendCommand("AT+CGSN", time.Second); err == nil {
+	if resp := sendCmd("AT+CGSN"); resp != "" {
 		info.IMEI = extractResponse(resp)
 	}
 
@@ -154,7 +167,6 @@ func New(port string, baudRate int) (*Modem, error) {
 		config:       config,
 		eventChan:    make(chan Event, 100),
 		stopEventsCh: make(chan struct{}),
-		reader:       bufio.NewReader(serialPort),
 	}
 
 	// Инициализация модема
@@ -233,43 +245,47 @@ func (m *Modem) sendCommand(cmd string, timeout time.Duration) (string, error) {
 // readResponse читает ответ от модема
 func (m *Modem) readResponse(timeout time.Duration) (string, error) {
 	var response strings.Builder
-	timeoutCh := time.After(timeout)
+	buf := make([]byte, 1024)
+	startTime := time.Now()
 
-	for {
-		select {
-		case <-timeoutCh:
-			if response.Len() == 0 {
-				return "", errors.New("timeout waiting for response")
+	for time.Since(startTime) < timeout {
+		// Читаем доступные данные
+		n, err := m.port.Read(buf)
+		if err != nil {
+			// Если уже что-то прочитали и есть финальный ответ, возвращаем
+			if response.Len() > 0 {
+				responseStr := response.String()
+				if strings.Contains(responseStr, "OK") ||
+					strings.Contains(responseStr, "ERROR") {
+					return responseStr, nil
+				}
 			}
-			return response.String(), nil
-		default:
-			m.port.SetReadTimeout(time.Millisecond * 100)
-			line, err := m.reader.ReadString('\n')
-			if err != nil {
-				if response.Len() > 0 && strings.Contains(response.String(), "OK") {
-					return response.String(), nil
-				}
-				if response.Len() > 0 && strings.Contains(response.String(), "ERROR") {
-					return response.String(), errors.New("command returned ERROR")
-				}
-				continue
-			}
+			// Небольшая пауза перед следующей попыткой
+			time.Sleep(10 * time.Millisecond)
+			continue
+		}
 
-			line = strings.TrimSpace(line)
-			if line != "" {
-				response.WriteString(line)
-				response.WriteString("\n")
+		if n > 0 {
+			response.Write(buf[:n])
+			responseStr := response.String()
 
-				// Проверяем на финальные ответы
-				if strings.HasPrefix(line, "OK") ||
-					strings.HasPrefix(line, "ERROR") ||
-					strings.HasPrefix(line, "+CME ERROR") ||
-					strings.HasPrefix(line, "+CMS ERROR") {
-					return response.String(), nil
-				}
+			// Проверяем на финальные ответы
+			if strings.Contains(responseStr, "\r\nOK\r\n") ||
+				strings.Contains(responseStr, "\r\nERROR\r\n") ||
+				strings.Contains(responseStr, "\r\n+CME ERROR") ||
+				strings.Contains(responseStr, "\r\n+CMS ERROR") {
+				return responseStr, nil
 			}
 		}
+
+		// Небольшая пауза между чтениями
+		time.Sleep(10 * time.Millisecond)
 	}
+
+	if response.Len() == 0 {
+		return "", errors.New("timeout waiting for response")
+	}
+	return response.String(), nil
 }
 
 // extractResponse извлекает чистый ответ из AT команды
