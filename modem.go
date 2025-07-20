@@ -13,11 +13,12 @@ import (
 
 // Modem представляет GSM модем
 type Modem struct {
-	port         *serial.Port
-	config       *serial.Config
-	mu           sync.Mutex
-	eventChan    chan Event
-	stopEventsCh chan struct{}
+	port          *serial.Port
+	config        *serial.Config
+	mu            sync.Mutex
+	eventChan     chan Event
+	stopEventsCh  chan struct{}
+	eventsEnabled bool
 }
 
 // ModemInfo содержит информацию о модеме
@@ -163,10 +164,11 @@ func New(port string, baudRate int) (*Modem, error) {
 	}
 
 	m := &Modem{
-		port:         serialPort,
-		config:       config,
-		eventChan:    make(chan Event, 100),
-		stopEventsCh: make(chan struct{}),
+		port:          serialPort,
+		config:        config,
+		eventChan:     make(chan Event, 100),
+		stopEventsCh:  make(chan struct{}),
+		eventsEnabled: false,
 	}
 
 	// Инициализация модема
@@ -208,8 +210,10 @@ func (m *Modem) Close() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	if m.stopEventsCh != nil {
+	// Останавливаем события если они запущены
+	if m.eventsEnabled {
 		close(m.stopEventsCh)
+		m.eventsEnabled = false
 	}
 
 	if m.port != nil {
@@ -307,6 +311,13 @@ func extractResponse(response string) string {
 }
 
 // GetEventChannel возвращает канал событий
-func (m *Modem) GetEventChannel() <-chan Event {
-	return m.eventChan
+func (m *Modem) GetEventChannel() (<-chan Event, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if !m.eventsEnabled {
+		return nil, fmt.Errorf("event listener is not running, call StartEventListener() first")
+	}
+
+	return m.eventChan, nil
 }

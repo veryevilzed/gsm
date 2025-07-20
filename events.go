@@ -2,7 +2,6 @@ package gsm
 
 import (
 	"fmt"
-	"github.com/tarm/serial"
 	"strconv"
 	"strings"
 	"time"
@@ -31,49 +30,63 @@ type Event struct {
 
 // StartEventListener запускает прослушивание событий
 func (m *Modem) StartEventListener() error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// Проверяем, не запущены ли уже события
+	if m.eventsEnabled {
+		return fmt.Errorf("event listener is already running")
+	}
+
 	// Настраиваем уведомления о новых SMS
 	if err := m.EnableNewSMSNotification(); err != nil {
 		return fmt.Errorf("failed to enable SMS notifications: %w", err)
 	}
 
 	// Включаем отображение входящих звонков
-	if _, err := m.SendCommand("AT+CLIP=1", time.Second); err != nil {
+	if _, err := m.sendCommand("AT+CLIP=1", time.Second); err != nil {
 		return fmt.Errorf("failed to enable caller ID: %w", err)
 	}
 
 	// Включаем уведомления о изменении регистрации в сети
-	if _, err := m.SendCommand("AT+CREG=2", time.Second); err != nil {
+	if _, err := m.sendCommand("AT+CREG=2", time.Second); err != nil {
 		return fmt.Errorf("failed to enable network registration updates: %w", err)
 	}
 
-	// Создаем отдельное соединение для событий с коротким таймаутом
-	eventConfig := &serial.Config{
-		Name:        m.config.Name,
-		Baud:        m.config.Baud,
-		ReadTimeout: time.Millisecond * 100,
-	}
-
-	eventPort, err := serial.OpenPort(eventConfig)
-	if err != nil {
-		// Используем основной порт если не можем открыть отдельный
-		go m.eventListenerLoop()
-	} else {
-		// Закроем при остановке
-		go func() {
-			<-m.stopEventsCh
-			eventPort.Close()
-		}()
-		go m.eventListenerLoopWithPort(eventPort)
-	}
+	// Запускаем горутину для чтения событий
+	m.eventsEnabled = true
+	m.stopEventsCh = make(chan struct{})
+	go m.eventListenerLoop()
 
 	return nil
 }
 
 // StopEventListener останавливает прослушивание событий
-func (m *Modem) StopEventListener() {
-	if m.stopEventsCh != nil {
-		close(m.stopEventsCh)
+func (m *Modem) StopEventListener() error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if !m.eventsEnabled {
+		return fmt.Errorf("event listener is not running")
 	}
+
+	// Останавливаем горутину
+	close(m.stopEventsCh)
+	m.eventsEnabled = false
+
+	// Отключаем уведомления
+	m.sendCommand("AT+CLIP=0", time.Second)
+	m.sendCommand("AT+CREG=0", time.Second)
+	m.sendCommand("AT+CNMI=0,0,0,0,0", time.Second)
+
+	return nil
+}
+
+// IsEventListenerRunning проверяет, запущен ли обработчик событий
+func (m *Modem) IsEventListenerRunning() bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.eventsEnabled
 }
 
 // eventListenerLoop основной цикл обработки событий
@@ -86,6 +99,11 @@ func (m *Modem) eventListenerLoop() {
 		case <-m.stopEventsCh:
 			return
 		default:
+			// Проверяем, включены ли события
+			if !m.eventsEnabled {
+				return
+			}
+
 			// Читаем данные (с таймаутом из конфига)
 			n, err := m.port.Read(buf)
 			if err != nil {

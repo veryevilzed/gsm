@@ -30,30 +30,30 @@ go get github.com/tarm/serial
 package main
 
 import (
-    "fmt"
-    "log"
-    "github.com/yourusername/gsm"
+	"fmt"
+	"log"
+	"github.com/yourusername/gsm"
 )
 
 func main() {
-    // Поиск доступных модемов
-    modems, _ := gsm.GetAvailableModems()
-    for _, m := range modems {
-        fmt.Printf("Найден модем: %s - %s\n", m.Port, m.Description)
-    }
+	// Поиск доступных модемов
+	modems, _ := gsm.GetAvailableModems()
+	for _, m := range modems {
+		fmt.Printf("Найден модем: %s - %s\n", m.Port, m.Description)
+	}
 
-    // Подключение к модему
-    modem, err := gsm.New("/dev/ttyUSB0", 115200)
-    if err != nil {
-        log.Fatal(err)
-    }
-    defer modem.Close()
+	// Подключение к модему
+	modem, err := gsm.New("/dev/ttyUSB0", 115200)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer modem.Close()
 
-    // Отправка SMS
-    err = modem.SendSMS("+79991234567", "Привет из Go!")
-    if err != nil {
-        log.Printf("Ошибка отправки SMS: %v", err)
-    }
+	// Отправка SMS
+	err = modem.SendSMS("+79991234567", "Привет из Go!")
+	if err != nil {
+		log.Printf("Ошибка отправки SMS: %v", err)
+	}
 }
 ```
 
@@ -128,9 +128,22 @@ sms, _ := modem.ReadSMS(1)
 // Список всех SMS
 messages, _ := modem.ListSMS("ALL")
 
+// Список непрочитанных SMS
+unreadMessages, _ := modem.ListUnreadSMS()
+
+// Список прочитанных SMS
+readMessages, _ := modem.ListReadSMS()
+
+// Количество непрочитанных
+count, _ := modem.CountUnreadSMS()
+
+// Пометить как прочитанное
+err := modem.MarkSMSAsRead(1)
+
 // Удаление SMS
 err := modem.DeleteSMS(1)
 err := modem.DeleteAllSMS()
+err := modem.DeleteReadSMS()
 
 // Настройка хранилища
 err := modem.SetSMSStorage(gsm.StorageSIM, gsm.StorageSIM, gsm.StorageSIM)
@@ -161,12 +174,24 @@ response, _ := modem.SendUSSD("*100#") // Проверка баланса
 
 ### События
 
+События в библиотеке опциональны и должны быть явно включены:
+
 ```go
-// Запуск обработчика событий
-err := modem.StartEventListener()
+// Проверка статуса обработчика событий
+if !modem.IsEventListenerRunning() {
+    // Запуск обработчика событий
+    err := modem.StartEventListener()
+    if err != nil {
+        log.Printf("Ошибка запуска событий: %v", err)
+    }
+}
 
 // Получение канала событий
-eventChan := modem.GetEventChannel()
+eventChan, err := modem.GetEventChannel()
+if err != nil {
+    log.Printf("События не запущены: %v", err)
+    return
+}
 
 // Обработка событий
 go func() {
@@ -182,6 +207,9 @@ go func() {
         }
     }
 }()
+
+// Остановка обработчика событий
+err = modem.StopEventListener()
 ```
 
 ## Типы событий
@@ -235,30 +263,30 @@ for event := range events {
 
 ```go
 func smsGateway(modem *gsm.Modem) {
-    // Очистка старых сообщений
-    modem.DeleteAllSMS()
-    
-    // Включение уведомлений
-    modem.EnableNewSMSNotification()
-    
-    // Обработка команд через SMS
-    for event := range modem.GetEventChannel() {
-        if event.Type == gsm.EventNewSMS {
-            sms, _ := modem.ReadSMS(event.Data["index"].(int))
-            
-            switch sms.Text {
-            case "STATUS":
-                info, _ := modem.GetExtendedInfo()
-                response := fmt.Sprintf("Signal: %s, Operator: %s", 
-                    info["SignalRSSI"], info["Operator"])
-                modem.SendSMS(sms.Sender, response)
-                
-            case "BALANCE":
-                balance, _ := modem.SendUSSD("*100#")
-                modem.SendSMS(sms.Sender, balance)
-            }
-        }
-    }
+// Очистка старых сообщений
+modem.DeleteAllSMS()
+
+// Включение уведомлений
+modem.EnableNewSMSNotification()
+
+// Обработка команд через SMS
+for event := range modem.GetEventChannel() {
+if event.Type == gsm.EventNewSMS {
+sms, _ := modem.ReadSMS(event.Data["index"].(int))
+
+switch sms.Text {
+case "STATUS":
+info, _ := modem.GetExtendedInfo()
+response := fmt.Sprintf("Signal: %s, Operator: %s",
+info["SignalRSSI"], info["Operator"])
+modem.SendSMS(sms.Sender, response)
+
+case "BALANCE":
+balance, _ := modem.SendUSSD("*100#")
+modem.SendSMS(sms.Sender, balance)
+}
+}
+}
 }
 ```
 

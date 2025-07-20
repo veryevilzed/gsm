@@ -113,6 +113,26 @@ func (m *Modem) ListSMS(status string) ([]*SMS, error) {
 	return parseSMSList(resp)
 }
 
+// ListUnreadSMS возвращает список непрочитанных SMS
+func (m *Modem) ListUnreadSMS() ([]*SMS, error) {
+	return m.ListSMS("REC UNREAD")
+}
+
+// ListReadSMS возвращает список прочитанных SMS
+func (m *Modem) ListReadSMS() ([]*SMS, error) {
+	return m.ListSMS("REC READ")
+}
+
+// ListSentSMS возвращает список отправленных SMS
+func (m *Modem) ListSentSMS() ([]*SMS, error) {
+	return m.ListSMS("STO SENT")
+}
+
+// ListUnsentSMS возвращает список неотправленных SMS
+func (m *Modem) ListUnsentSMS() ([]*SMS, error) {
+	return m.ListSMS("STO UNSENT")
+}
+
 // DeleteSMS удаляет SMS по индексу
 func (m *Modem) DeleteSMS(index int) error {
 	cmd := fmt.Sprintf("AT+CMGD=%d", index)
@@ -135,6 +155,41 @@ func (m *Modem) DeleteAllSMS() error {
 		}
 	}
 	return nil
+}
+
+// CountUnreadSMS возвращает количество непрочитанных SMS
+func (m *Modem) CountUnreadSMS() (int, error) {
+	messages, err := m.ListUnreadSMS()
+	if err != nil {
+		return 0, err
+	}
+	return len(messages), nil
+}
+
+// MarkSMSAsRead помечает SMS как прочитанное (читает его)
+func (m *Modem) MarkSMSAsRead(index int) error {
+	// В GSM модемах сообщение автоматически помечается как прочитанное при чтении
+	_, err := m.ReadSMS(index)
+	return err
+}
+
+// DeleteReadSMS удаляет все прочитанные SMS
+func (m *Modem) DeleteReadSMS() error {
+	// Удаляем все прочитанные сообщения (флаг 1)
+	_, err := m.SendCommand("AT+CMGD=1,1", time.Second*5)
+	if err != nil {
+		// Альтернативный синтаксис для некоторых модемов
+		_, err = m.SendCommand("AT+CMGDA=\"DEL READ\"", time.Second*5)
+	}
+	return err
+}
+
+// DeleteSMSByStatus удаляет SMS по статусу
+func (m *Modem) DeleteSMSByStatus(status int) error {
+	// status: 0=all received read, 1=all received read, 2=all stored sent, 3=all stored unsent, 4=all messages
+	cmd := fmt.Sprintf("AT+CMGD=1,%d", status)
+	_, err := m.SendCommand(cmd, time.Second*5)
+	return err
 }
 
 // SetSMSStorage устанавливает хранилище для SMS
