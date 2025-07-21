@@ -9,23 +9,23 @@ import (
 
 // SMS представляет текстовое сообщение
 type SMS struct {
-	Index    int
-	Status   string
-	Sender   string
-	Receiver string
-	Time     time.Time
-	Text     string
+	Index    int       // Индекс сообщения в памяти модема (1-255)
+	Status   string    // Статус сообщения: "REC UNREAD", "REC READ", "STO SENT", "STO UNSENT"
+	Sender   string    // Номер телефона отправителя в международном формате (+7...)
+	Receiver string    // Номер телефона получателя (для отправленных сообщений)
+	Time     time.Time // Время получения/отправки сообщения
+	Text     string    // Текст сообщения (до 160 символов для латиницы, 70 для кириллицы)
 }
 
 // SMSStorage представляет хранилище SMS
 type SMSStorage string
 
 const (
-	StorageSIM       SMSStorage = "SM" // SIM card
-	StoragePhone     SMSStorage = "ME" // Phone memory
-	StorageAny       SMSStorage = "MT" // Any storage
-	StorageBroadcast SMSStorage = "BM" // Broadcast message
-	StorageStatus    SMSStorage = "SR" // Status report
+	StorageSIM       SMSStorage = "SM" // SIM card - хранилище на SIM-карте
+	StoragePhone     SMSStorage = "ME" // Phone memory - внутренняя память модема
+	StorageAny       SMSStorage = "MT" // Any storage - любое доступное хранилище
+	StorageBroadcast SMSStorage = "BM" // Broadcast message - широковещательные сообщения
+	StorageStatus    SMSStorage = "SR" // Status report - отчеты о доставке
 )
 
 // SendSMS отправляет SMS сообщение
@@ -35,9 +35,30 @@ func (m *Modem) SendSMS(number, text string) error {
 		return fmt.Errorf("failed to set text mode: %w", err)
 	}
 
-	// Устанавливаем кодировку GSM
-	if _, err := m.SendCommand("AT+CSCS=\"GSM\"", time.Second); err != nil {
-		return fmt.Errorf("failed to set GSM encoding: %w", err)
+	// Проверяем, нужна ли UCS2 кодировка
+	needsUCS2 := false
+	for _, r := range text {
+		if r > 127 {
+			needsUCS2 = true
+			break
+		}
+	}
+
+	if needsUCS2 {
+		// Устанавливаем UCS2 кодировку
+		if _, err := m.SendCommand("AT+CSCS=\"UCS2\"", time.Second); err != nil {
+			return fmt.Errorf("failed to set UCS2 encoding: %w", err)
+		}
+
+		// Кодируем номер в UCS2
+		number = EncodeUCS2(number)
+		// Кодируем текст в UCS2
+		text = EncodeUCS2(text)
+	} else {
+		// Устанавливаем GSM кодировку для ASCII
+		if _, err := m.SendCommand("AT+CSCS=\"GSM\"", time.Second); err != nil {
+			return fmt.Errorf("failed to set GSM encoding: %w", err)
+		}
 	}
 
 	// Подготавливаем команду отправки
@@ -70,6 +91,9 @@ func (m *Modem) SendSMS(number, text string) error {
 	if !strings.Contains(resp, "OK") {
 		return fmt.Errorf("SMS sending failed: %s", resp)
 	}
+
+	// Возвращаем кодировку обратно на GSM
+	m.sendCommand("AT+CSCS=\"GSM\"", time.Second)
 
 	return nil
 }
@@ -277,7 +301,9 @@ func parseSMS(response string, index int) (*SMS, error) {
 
 			// Текст сообщения обычно на следующей строке
 			if i+1 < len(lines) {
-				sms.Text = strings.TrimSpace(lines[i+1])
+				text := strings.TrimSpace(lines[i+1])
+				// Декодируем текст если это UCS2
+				sms.Text = DecodeGSMText(text)
 			}
 			break
 		}
@@ -331,7 +357,8 @@ func parseSMSList(response string) ([]*SMS, error) {
 				if i+1 < len(lines) {
 					nextLine := strings.TrimSpace(lines[i+1])
 					if !strings.HasPrefix(nextLine, "+CMGL:") && nextLine != "OK" && nextLine != "" {
-						sms.Text = nextLine
+						// Декодируем текст если это UCS2
+						sms.Text = DecodeGSMText(nextLine)
 						i++ // Пропускаем следующую строку
 					}
 				}

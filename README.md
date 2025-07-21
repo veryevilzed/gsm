@@ -6,6 +6,7 @@
 
 - 🔍 Автоматическое обнаружение модемов
 - 📱 Отправка и получение SMS
+- 🌍 Поддержка Unicode/кириллицы в SMS
 - 📞 Управление звонками
 - 🌐 Мониторинг состояния сети
 - 📡 USSD запросы
@@ -342,14 +343,16 @@ number, _ := modem.GetSIMNumber()
 ### SMS
 
 ```go
-// Отправка SMS
-err := modem.SendSMS("+79991234567", "Текст сообщения")
+// Отправка SMS (автоматически определяет кодировку)
+err := modem.SendSMS("+79991234567", "Привет!") // Кириллица
+err := modem.SendSMS("+79991234567", "Hello!")  // ASCII
 
 // Отправка длинного SMS (автоматическая разбивка)
 err := modem.SendLongSMS("+79991234567", "Очень длинное сообщение...")
 
-// Чтение SMS по индексу
+// Чтение SMS по индексу (автоматическое декодирование)
 sms, _ := modem.ReadSMS(1)
+fmt.Printf("От: %s\nТекст: %s\n", sms.Sender, sms.Text)
 
 // Список всех SMS
 messages, _ := modem.ListSMS("ALL")
@@ -373,6 +376,33 @@ err := modem.DeleteReadSMS()
 
 // Настройка хранилища
 err := modem.SetSMSStorage(gsm.StorageSIM, gsm.StorageSIM, gsm.StorageSIM)
+```
+
+### Работа с Unicode/кириллицей
+
+Библиотека автоматически обрабатывает Unicode текст в SMS:
+
+```go
+// Отправка на русском
+err := modem.SendSMS("+79991234567", "Привет, как дела?")
+
+// Отправка с emoji
+err := modem.SendSMS("+79991234567", "Hello 👋 🚀")
+
+// Смешанный текст
+err := modem.SendSMS("+79991234567", "Test тест 测试")
+
+// Ручное декодирование UCS2
+decoded, err := gsm.DecodeUCS2("043F044004380432043504420021")
+// decoded = "привет!"
+
+// Ручное кодирование в UCS2
+encoded := gsm.EncodeUCS2("Привет!")
+// encoded = "041F04400438043204350442002100"
+
+// Автоматическое определение и декодирование
+text := gsm.DecodeGSMText("043F044004380432043504420021")
+// text = "привет!"
 ```
 
 ### Звонки
@@ -405,33 +435,33 @@ response, _ := modem.SendUSSD("*100#") // Проверка баланса
 ```go
 // Проверка статуса обработчика событий
 if !modem.IsEventListenerRunning() {
-    // Запуск обработчика событий
-    err := modem.StartEventListener()
-    if err != nil {
-        log.Printf("Ошибка запуска событий: %v", err)
-    }
+// Запуск обработчика событий
+err := modem.StartEventListener()
+if err != nil {
+log.Printf("Ошибка запуска событий: %v", err)
+}
 }
 
 // Получение канала событий
 eventChan, err := modem.GetEventChannel()
 if err != nil {
-    log.Printf("События не запущены: %v", err)
-    return
+log.Printf("События не запущены: %v", err)
+return
 }
 
 // Обработка событий
 go func() {
-    for event := range eventChan {
-        switch event.Type {
-        case gsm.EventNewSMS:
-            index := event.Data["index"].(int)
-            fmt.Printf("Новое SMS, индекс: %d\n", index)
-            
-        case gsm.EventIncomingCall:
-            number := event.Data["number"].(string)
-            fmt.Printf("Входящий звонок: %s\n", number)
-        }
-    }
+for event := range eventChan {
+switch event.Type {
+case gsm.EventNewSMS:
+index := event.Data["index"].(int)
+fmt.Printf("Новое SMS, индекс: %d\n", index)
+
+case gsm.EventIncomingCall:
+number := event.Data["number"].(string)
+fmt.Printf("Входящий звонок: %s\n", number)
+}
+}
 }()
 
 // Остановка обработчика событий
@@ -470,18 +500,18 @@ modem.StartEventListener()
 events := modem.GetEventChannel()
 
 for event := range events {
-    if event.Type == gsm.EventNewSMS {
-        index := event.Data["index"].(int)
-        sms, _ := modem.ReadSMS(index)
-        
-        fmt.Printf("SMS от %s: %s\n", sms.Sender, sms.Text)
-        
-        // Автоответ
-        modem.SendSMS(sms.Sender, "Сообщение получено!")
-        
-        // Удаление после обработки
-        modem.DeleteSMS(index)
-    }
+if event.Type == gsm.EventNewSMS {
+index := event.Data["index"].(int)
+sms, _ := modem.ReadSMS(index)
+
+fmt.Printf("SMS от %s: %s\n", sms.Sender, sms.Text)
+
+// Автоответ
+modem.SendSMS(sms.Sender, "Сообщение получено!")
+
+// Удаление после обработки
+modem.DeleteSMS(index)
+}
 }
 ```
 
@@ -489,7 +519,7 @@ for event := range events {
 
 ```go
 func smsGateway(modem *gsm.Modem) {
-    // Очистка старых сообщений
+// Очистка старых сообщений
     modem.DeleteAllSMS()
     
     // Включение уведомлений
@@ -499,20 +529,20 @@ func smsGateway(modem *gsm.Modem) {
     for event := range modem.GetEventChannel() {
         if event.Type == gsm.EventNewSMS {
             sms, _ := modem.ReadSMS(event.Data["index"].(int))
-            
+    
             switch sms.Text {
             case "STATUS":
                 info, _ := modem.GetExtendedInfo()
-                response := fmt.Sprintf("Signal: %s, Operator: %s", 
-                    info["SignalRSSI"], info["Operator"])
+                response := fmt.Sprintf("Signal: %s, Operator: %s",
+                info["SignalRSSI"], info["Operator"])
                 modem.SendSMS(sms.Sender, response)
-                
+            
             case "BALANCE":
                 balance, _ := modem.SendUSSD("*100#")
                 modem.SendSMS(sms.Sender, balance)
             }
-        }
     }
+}
 }
 ```
 
