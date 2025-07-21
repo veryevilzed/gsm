@@ -20,12 +20,12 @@
 
 ```go
 type SMS struct {
-    Index    int       // Индекс сообщения в памяти модема
-    Status   string    // Статус: "REC UNREAD", "REC READ", "STO SENT", "STO UNSENT"
-    Sender   string    // Номер телефона отправителя (формат: "+79991234567")
-    Receiver string    // Номер телефона получателя (для отправленных)
-    Time     time.Time // Время получения/отправки сообщения
-    Text     string    // Текст сообщения
+Index    int       // Индекс сообщения в памяти модема
+Status   string    // Статус: "REC UNREAD", "REC READ", "STO SENT", "STO UNSENT"
+Sender   string    // Номер телефона отправителя (формат: "+79991234567")
+Receiver string    // Номер телефона получателя (для отправленных)
+Time     time.Time // Время получения/отправки сообщения
+Text     string    // Текст сообщения
 }
 ```
 
@@ -34,12 +34,12 @@ type SMS struct {
 
 ```go
 type ModemInfo struct {
-    Port         string // Последовательный порт (например: "/dev/ttyUSB0", "COM3")
-    Manufacturer string // Производитель модема (например: "Huawei")
-    Model        string // Модель модема (например: "E3372")
-    Revision     string // Версия прошивки
-    IMEI         string // IMEI модема (15 цифр)
-    Description  string // Составное описание: "Manufacturer Model"
+Port         string // Последовательный порт (например: "/dev/ttyUSB0", "COM3")
+Manufacturer string // Производитель модема (например: "Huawei")
+Model        string // Модель модема (например: "E3372")
+Revision     string // Версия прошивки
+IMEI         string // IMEI модема (15 цифр)
+Description  string // Составное описание: "Manufacturer Model"
 }
 ```
 
@@ -48,8 +48,8 @@ type ModemInfo struct {
 
 ```go
 type SignalQuality struct {
-    RSSI int // Уровень сигнала (0-31, где 31 = отличный, 99 = неизвестно)
-    BER  int // Bit Error Rate (0-7, где 0 = отлично, 99 = неизвестно)
+RSSI int // Уровень сигнала (0-31, где 31 = отличный, 99 = неизвестно)
+BER  int // Bit Error Rate (0-7, где 0 = отлично, 99 = неизвестно)
 }
 ```
 
@@ -58,10 +58,10 @@ type SignalQuality struct {
 
 ```go
 type OperatorInfo struct {
-    Status    string // Статус оператора: "0"=неизвестно, "1"=доступен, "2"=текущий, "3"=запрещен
-    LongName  string // Полное название (например: "MegaFon")
-    ShortName string // Короткое название (например: "MegaFon")
-    Numeric   string // Числовой код оператора (например: "25002" для МегаФон)
+Status    string // Статус оператора: "0"=неизвестно, "1"=доступен, "2"=текущий, "3"=запрещен
+LongName  string // Полное название (например: "MegaFon")
+ShortName string // Короткое название (например: "MegaFon")
+Numeric   string // Числовой код оператора (например: "25002" для МегаФон)
 }
 ```
 
@@ -70,9 +70,9 @@ type OperatorInfo struct {
 
 ```go
 type Event struct {
-    Type      EventType              // Тип события (см. ниже)
-    Timestamp time.Time              // Время события
-    Data      map[string]interface{} // Данные события (зависят от типа)
+Type      EventType              // Тип события (см. ниже)
+Timestamp time.Time              // Время события
+Data      map[string]interface{} // Данные события (зависят от типа)
 }
 ```
 
@@ -80,14 +80,14 @@ type Event struct {
 
 ```go
 const (
-    EventNewSMS          EventType = "NEW_SMS"          // Новое SMS (Data: "index", "storage")
-    EventIncomingCall    EventType = "INCOMING_CALL"    // Входящий звонок (Data: "number")
-    EventCallEnded       EventType = "CALL_ENDED"       // Звонок завершен (Data: "reason")
-    EventNetworkChange   EventType = "NETWORK_CHANGE"   // Изменение сети (Data: "status", "lac", "cellId")
-    EventSignalChange    EventType = "SIGNAL_CHANGE"    // Изменение сигнала
-    EventUSSD            EventType = "USSD"             // USSD ответ (Data: "message")
-    EventModemError      EventType = "MODEM_ERROR"      // Ошибка модема (Data: "error")
-    EventSMSDeliveryReport EventType = "SMS_DELIVERY_REPORT" // Отчет о доставке
+EventNewSMS          EventType = "NEW_SMS"          // Новое SMS (Data: "index", "storage")
+EventIncomingCall    EventType = "INCOMING_CALL"    // Входящий звонок (Data: "number")
+EventCallEnded       EventType = "CALL_ENDED"       // Звонок завершен (Data: "reason")
+EventNetworkChange   EventType = "NETWORK_CHANGE"   // Изменение сети (Data: "status", "lac", "cellId")
+EventSignalChange    EventType = "SIGNAL_CHANGE"    // Изменение сигнала
+EventUSSD            EventType = "USSD"             // USSD ответ (Data: "message")
+EventModemError      EventType = "MODEM_ERROR"      // Ошибка модема (Data: "error")
+EventSMSDeliveryReport EventType = "SMS_DELIVERY_REPORT" // Отчет о доставке
 )
 ```
 
@@ -96,12 +96,12 @@ const (
 
 ```go
 const (
-    NetworkNotRegistered      NetworkStatus = 0 // Не зарегистрирован
-    NetworkRegisteredHome     NetworkStatus = 1 // Зарегистрирован (домашняя сеть)
-    NetworkSearching          NetworkStatus = 2 // Поиск сети
-    NetworkRegistrationDenied NetworkStatus = 3 // Регистрация отклонена
-    NetworkUnknown            NetworkStatus = 4 // Неизвестный статус
-    NetworkRegisteredRoaming  NetworkStatus = 5 // Зарегистрирован (роуминг)
+NetworkNotRegistered      NetworkStatus = 0 // Не зарегистрирован
+NetworkRegisteredHome     NetworkStatus = 1 // Зарегистрирован (домашняя сеть)
+NetworkSearching          NetworkStatus = 2 // Поиск сети
+NetworkRegistrationDenied NetworkStatus = 3 // Регистрация отклонена
+NetworkUnknown            NetworkStatus = 4 // Неизвестный статус
+NetworkRegisteredRoaming  NetworkStatus = 5 // Зарегистрирован (роуминг)
 )
 ```
 
@@ -110,11 +110,11 @@ const (
 
 ```go
 const (
-    PinReady    PinStatus = "READY"     // SIM готова к работе
-    PinRequired PinStatus = "SIM PIN"   // Требуется ввод PIN
-    PukRequired PinStatus = "SIM PUK"   // Требуется ввод PUK
-    PinBlocked  PinStatus = "SIM PIN2"  // PIN2 заблокирован
-    PukBlocked  PinStatus = "SIM PUK2"  // PUK2 заблокирован
+PinReady    PinStatus = "READY"     // SIM готова к работе
+PinRequired PinStatus = "SIM PIN"   // Требуется ввод PIN
+PukRequired PinStatus = "SIM PUK"   // Требуется ввод PUK
+PinBlocked  PinStatus = "SIM PIN2"  // PIN2 заблокирован
+PukBlocked  PinStatus = "SIM PUK2"  // PUK2 заблокирован
 )
 ```
 
@@ -123,12 +123,12 @@ const (
 
 ```go
 const (
-    ModemModeOffline      ModemMode = 0 // Оффлайн режим (режим полета)
-    ModemModeOnline       ModemMode = 1 // Полная функциональность
-    ModemModeLowPower     ModemMode = 2 // Режим энергосбережения
-    ModemModeFactoryTest  ModemMode = 3 // Заводской тест
-    ModemModeReset        ModemMode = 4 // Сброс
-    ModemModeShuttingDown ModemMode = 5 // Выключение
+ModemModeOffline      ModemMode = 0 // Оффлайн режим (режим полета)
+ModemModeOnline       ModemMode = 1 // Полная функциональность
+ModemModeLowPower     ModemMode = 2 // Режим энергосбережения
+ModemModeFactoryTest  ModemMode = 3 // Заводской тест
+ModemModeReset        ModemMode = 4 // Сброс
+ModemModeShuttingDown ModemMode = 5 // Выключение
 )
 ```
 
@@ -137,11 +137,11 @@ const (
 
 ```go
 const (
-    StorageSIM       SMSStorage = "SM" // SIM карта
-    StoragePhone     SMSStorage = "ME" // Память телефона/модема
-    StorageAny       SMSStorage = "MT" // Любое хранилище
-    StorageBroadcast SMSStorage = "BM" // Широковещательные сообщения
-    StorageStatus    SMSStorage = "SR" // Отчеты о статусе
+StorageSIM       SMSStorage = "SM" // SIM карта
+StoragePhone     SMSStorage = "ME" // Память телефона/модема
+StorageAny       SMSStorage = "MT" // Любое хранилище
+StorageBroadcast SMSStorage = "BM" // Широковещательные сообщения
+StorageStatus    SMSStorage = "SR" // Отчеты о статусе
 )
 ```
 
@@ -153,17 +153,17 @@ const (
 // Получение SMS возвращает структуру SMS
 sms, err := modem.ReadSMS(1)
 if err == nil {
-    fmt.Printf("От: %s\n", sms.Sender)
-    fmt.Printf("Текст: %s\n", sms.Text)
-    fmt.Printf("Время: %s\n", sms.Time.Format("02.01.2006 15:04"))
-    fmt.Printf("Статус: %s\n", sms.Status)
+fmt.Printf("От: %s\n", sms.Sender)
+fmt.Printf("Текст: %s\n", sms.Text)
+fmt.Printf("Время: %s\n", sms.Time.Format("02.01.2006 15:04"))
+fmt.Printf("Статус: %s\n", sms.Status)
 }
 
 // ListSMS возвращает слайс указателей на SMS
 messages, err := modem.ListUnreadSMS()
 for _, msg := range messages {
-    // msg имеет тип *SMS
-    fmt.Printf("[%d] %s: %s\n", msg.Index, msg.Sender, msg.Text)
+// msg имеет тип *SMS
+fmt.Printf("[%d] %s: %s\n", msg.Index, msg.Sender, msg.Text)
 }
 ```
 
@@ -173,19 +173,19 @@ for _, msg := range messages {
 // GetExtendedInfo возвращает map[string]string
 info, err := modem.GetExtendedInfo()
 if err == nil {
-    fmt.Printf("Производитель: %s\n", info["Manufacturer"])
-    fmt.Printf("Модель: %s\n", info["Model"])
-    fmt.Printf("IMEI: %s\n", info["IMEI"])
-    fmt.Printf("Оператор: %s\n", info["Operator"])
-    fmt.Printf("Уровень сигнала: %s/31\n", info["SignalRSSI"])
+fmt.Printf("Производитель: %s\n", info["Manufacturer"])
+fmt.Printf("Модель: %s\n", info["Model"])
+fmt.Printf("IMEI: %s\n", info["IMEI"])
+fmt.Printf("Оператор: %s\n", info["Operator"])
+fmt.Printf("Уровень сигнала: %s/31\n", info["SignalRSSI"])
 }
 
 // GetSignalQuality возвращает структуру SignalQuality
 signal, err := modem.GetSignalQuality()
 if err == nil {
-    percentage := (signal.RSSI * 100) / 31
-    fmt.Printf("Сигнал: %d%% (RSSI: %d, BER: %d)\n", 
-        percentage, signal.RSSI, signal.BER)
+percentage := (signal.RSSI * 100) / 31
+fmt.Printf("Сигнал: %d%% (RSSI: %d, BER: %d)\n",
+percentage, signal.RSSI, signal.BER)
 }
 ```
 
@@ -195,29 +195,29 @@ if err == nil {
 // Включаем события
 err := modem.StartEventListener()
 if err == nil {
-    eventChan, _ := modem.GetEventChannel()
-    
-    for event := range eventChan {
-        switch event.Type {
-        case gsm.EventNewSMS:
-            // Data содержит: index (int), storage (string)
-            index := event.Data["index"].(int)
-            storage := event.Data["storage"].(string)
-            fmt.Printf("Новое SMS #%d в %s\n", index, storage)
-            
-        case gsm.EventIncomingCall:
-            // Data содержит: number (string)
-            if number, ok := event.Data["number"].(string); ok {
-                fmt.Printf("Звонок от: %s\n", number)
-            }
-            
-        case gsm.EventNetworkChange:
-            // Data содержит: status (NetworkStatus), statusText (string), 
-            // lac (string), cellId (string)
-            status := event.Data["status"].(NetworkStatus)
-            fmt.Printf("Сеть изменилась: %v\n", status)
-        }
-    }
+eventChan, _ := modem.GetEventChannel()
+
+for event := range eventChan {
+switch event.Type {
+case gsm.EventNewSMS:
+// Data содержит: index (int), storage (string)
+index := event.Data["index"].(int)
+storage := event.Data["storage"].(string)
+fmt.Printf("Новое SMS #%d в %s\n", index, storage)
+
+case gsm.EventIncomingCall:
+// Data содержит: number (string)
+if number, ok := event.Data["number"].(string); ok {
+fmt.Printf("Звонок от: %s\n", number)
+}
+
+case gsm.EventNetworkChange:
+// Data содержит: status (NetworkStatus), statusText (string), 
+// lac (string), cellId (string)
+status := event.Data["status"].(NetworkStatus)
+fmt.Printf("Сеть изменилась: %v\n", status)
+}
+}
 }
 ```
 
@@ -227,15 +227,15 @@ if err == nil {
 // GetCurrentOperator возвращает *OperatorInfo
 operator, err := modem.GetCurrentOperator()
 if err == nil {
-    fmt.Printf("Оператор: %s (%s)\n", 
-        operator.LongName, operator.Numeric)
+fmt.Printf("Оператор: %s (%s)\n",
+operator.LongName, operator.Numeric)
 }
 
 // ScanOperators возвращает []OperatorInfo
 operators, err := modem.ScanOperators()
 for _, op := range operators {
-    fmt.Printf("%s - %s (код: %s, статус: %s)\n", 
-        op.LongName, op.ShortName, op.Numeric, op.Status)
+fmt.Printf("%s - %s (код: %s, статус: %s)\n",
+op.LongName, op.ShortName, op.Numeric, op.Status)
 }
 ```
 
@@ -257,30 +257,30 @@ go get github.com/tarm/serial
 package main
 
 import (
-    "fmt"
-    "log"
-    "github.com/yourusername/gsm"
+	"fmt"
+	"log"
+	"github.com/yourusername/gsm"
 )
 
 func main() {
-    // Поиск доступных модемов
-    modems, _ := gsm.GetAvailableModems()
-    for _, m := range modems {
-        fmt.Printf("Найден модем: %s - %s\n", m.Port, m.Description)
-    }
+	// Поиск доступных модемов
+	modems, _ := gsm.GetAvailableModems()
+	for _, m := range modems {
+		fmt.Printf("Найден модем: %s - %s\n", m.Port, m.Description)
+	}
 
-    // Подключение к модему
-    modem, err := gsm.New("/dev/ttyUSB0", 115200)
-    if err != nil {
-        log.Fatal(err)
-    }
-    defer modem.Close()
+	// Подключение к модему
+	modem, err := gsm.New("/dev/ttyUSB0", 115200)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer modem.Close()
 
-    // Отправка SMS
-    err = modem.SendSMS("+79991234567", "Привет из Go!")
-    if err != nil {
-        log.Printf("Ошибка отправки SMS: %v", err)
-    }
+	// Отправка SMS
+	err = modem.SendSMS("+79991234567", "Привет из Go!")
+	if err != nil {
+		log.Printf("Ошибка отправки SMS: %v", err)
+	}
 }
 ```
 
@@ -333,7 +333,7 @@ status, _ := modem.GetSIMStatus()
 
 // Ввод PIN-кода
 if status == gsm.PinRequired {
-    err := modem.EnterPIN("1234")
+err := modem.EnterPIN("1234")
 }
 
 // Получение номера телефона (если сохранен на SIM)
@@ -500,18 +500,18 @@ modem.StartEventListener()
 events := modem.GetEventChannel()
 
 for event := range events {
-if event.Type == gsm.EventNewSMS {
-index := event.Data["index"].(int)
-sms, _ := modem.ReadSMS(index)
-
-fmt.Printf("SMS от %s: %s\n", sms.Sender, sms.Text)
-
-// Автоответ
-modem.SendSMS(sms.Sender, "Сообщение получено!")
-
-// Удаление после обработки
-modem.DeleteSMS(index)
-}
+    if event.Type == gsm.EventNewSMS {
+        index := event.Data["index"].(int)
+        sms, _ := modem.ReadSMS(index)
+        
+        fmt.Printf("SMS от %s: %s\n", sms.Sender, sms.Text)
+        
+        // Автоответ
+        modem.SendSMS(sms.Sender, "Сообщение получено!")
+        
+        // Удаление после обработки
+        modem.DeleteSMS(index)
+    }
 }
 ```
 
@@ -520,28 +520,28 @@ modem.DeleteSMS(index)
 ```go
 func smsGateway(modem *gsm.Modem) {
 // Очистка старых сообщений
-    modem.DeleteAllSMS()
-    
-    // Включение уведомлений
-    modem.EnableNewSMSNotification()
-    
-    // Обработка команд через SMS
-    for event := range modem.GetEventChannel() {
-        if event.Type == gsm.EventNewSMS {
-            sms, _ := modem.ReadSMS(event.Data["index"].(int))
-    
-            switch sms.Text {
-            case "STATUS":
-                info, _ := modem.GetExtendedInfo()
-                response := fmt.Sprintf("Signal: %s, Operator: %s",
-                info["SignalRSSI"], info["Operator"])
-                modem.SendSMS(sms.Sender, response)
-            
-            case "BALANCE":
-                balance, _ := modem.SendUSSD("*100#")
-                modem.SendSMS(sms.Sender, balance)
-            }
-    }
+modem.DeleteAllSMS()
+
+// Включение уведомлений
+modem.EnableNewSMSNotification()
+
+// Обработка команд через SMS
+for event := range modem.GetEventChannel() {
+if event.Type == gsm.EventNewSMS {
+sms, _ := modem.ReadSMS(event.Data["index"].(int))
+
+switch sms.Text {
+case "STATUS":
+info, _ := modem.GetExtendedInfo()
+response := fmt.Sprintf("Signal: %s, Operator: %s",
+info["SignalRSSI"], info["Operator"])
+modem.SendSMS(sms.Sender, response)
+
+case "BALANCE":
+balance, _ := modem.SendUSSD("*100#")
+modem.SendSMS(sms.Sender, balance)
+}
+}
 }
 }
 ```
