@@ -23,12 +23,12 @@ type Modem struct {
 
 // ModemInfo содержит информацию о модеме
 type ModemInfo struct {
-	Port         string
-	Manufacturer string
-	Model        string
-	Revision     string
-	IMEI         string
-	Description  string
+	Port         string // Последовательный порт модема (/dev/ttyUSB0, COM3 и т.д.)
+	Manufacturer string // Производитель модема (Huawei, ZTE и т.д.)
+	Model        string // Модель модема (E3372, MF823 и т.д.)
+	Revision     string // Версия прошивки модема
+	IMEI         string // International Mobile Equipment Identity (15 цифр)
+	Description  string // Составное описание: "Manufacturer Model"
 }
 
 // GetAvailableModems возвращает список доступных модемов
@@ -228,7 +228,12 @@ func (m *Modem) SendCommand(cmd string, timeout time.Duration) (string, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	return m.sendCommand(cmd, timeout)
+	response, err := m.sendCommand(cmd, timeout)
+
+	// Отладочный вывод
+	debugResponse(cmd, response)
+
+	return response, err
 }
 
 // sendCommand внутренний метод для отправки команд (без блокировки)

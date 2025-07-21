@@ -11,50 +11,79 @@ import (
 type NetworkStatus int
 
 const (
-	NetworkNotRegistered NetworkStatus = iota
-	NetworkRegisteredHome
-	NetworkSearching
-	NetworkRegistrationDenied
-	NetworkUnknown
-	NetworkRegisteredRoaming
+	NetworkNotRegistered      NetworkStatus = iota // 0 - не зарегистрирован, поиск не выполняется
+	NetworkRegisteredHome                          // 1 - зарегистрирован в домашней сети
+	NetworkSearching                               // 2 - не зарегистрирован, выполняется поиск сети
+	NetworkRegistrationDenied                      // 3 - регистрация отклонена
+	NetworkUnknown                                 // 4 - неизвестный статус
+	NetworkRegisteredRoaming                       // 5 - зарегистрирован в роуминге
 )
 
 // SignalQuality представляет качество сигнала
 type SignalQuality struct {
-	RSSI int // Received Signal Strength Indicator (0-31, 99=unknown)
-	BER  int // Bit Error Rate (0-7, 99=unknown)
+	RSSI int // Received Signal Strength Indicator (0-31, 99=неизвестно). 0-9=слабый, 10-14=средний, 15-19=хороший, 20-31=отличный
+	BER  int // Bit Error Rate (0-7, 99=неизвестно). 0=без ошибок, 7=максимум ошибок
 }
 
 // OperatorInfo содержит информацию об операторе
 type OperatorInfo struct {
-	Status    string
-	LongName  string
-	ShortName string
-	Numeric   string
+	Status    string // "0"=неизвестно, "1"=доступен, "2"=текущий, "3"=запрещен
+	LongName  string // Полное название оператора (например: "MegaFon")
+	ShortName string // Короткое название оператора
+	Numeric   string // Числовой код оператора MCC+MNC (например: "25002" = Россия + МегаФон)
 }
 
 // ModemMode представляет режим работы модема
 type ModemMode int
 
 const (
-	ModemModeOffline ModemMode = iota
-	ModemModeOnline
-	ModemModeLowPower
-	ModemModeFactoryTest
-	ModemModeReset
-	ModemModeShuttingDown
+	ModemModeOffline      ModemMode = iota // 0 - минимальная функциональность (режим полета)
+	ModemModeOnline                        // 1 - полная функциональность
+	ModemModeLowPower                      // 2 - отключить передатчик RF
+	ModemModeFactoryTest                   // 3 - заводской тестовый режим
+	ModemModeReset                         // 4 - сброс модема
+	ModemModeShuttingDown                  // 5 - выключение модема
 )
 
 // PinStatus представляет статус PIN-кода
 type PinStatus string
 
 const (
-	PinReady    PinStatus = "READY"
-	PinRequired PinStatus = "SIM PIN"
-	PukRequired PinStatus = "SIM PUK"
-	PinBlocked  PinStatus = "SIM PIN2"
-	PukBlocked  PinStatus = "SIM PUK2"
+	PinReady    PinStatus = "READY"    // SIM карта готова к работе
+	PinRequired PinStatus = "SIM PIN"  // Требуется ввод PIN-кода
+	PukRequired PinStatus = "SIM PUK"  // Требуется ввод PUK-кода (PIN заблокирован)
+	PinBlocked  PinStatus = "SIM PIN2" // Требуется ввод PIN2-кода
+	PukBlocked  PinStatus = "SIM PUK2" // Требуется ввод PUK2-кода
 )
+
+// parseATResponse парсит стандартный ответ AT команды
+func parseATResponse(response, prefix string) (string, error) {
+	lines := strings.Split(response, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, prefix) {
+			// Убираем префикс и возвращаем данные
+			return strings.TrimSpace(line[len(prefix):]), nil
+		}
+	}
+	return "", fmt.Errorf("prefix %s not found in response", prefix)
+}
+
+// parseATResponseValues парсит ответ и разделяет по запятой
+func parseATResponseValues(response, prefix string) ([]string, error) {
+	data, err := parseATResponse(response, prefix)
+	if err != nil {
+		return nil, err
+	}
+
+	// Разделяем по запятой и убираем пробелы
+	parts := strings.Split(data, ",")
+	for i := range parts {
+		parts[i] = strings.TrimSpace(parts[i])
+	}
+
+	return parts, nil
+}
 
 // TestConnection проверяет связь с модемом
 func (m *Modem) TestConnection() error {
@@ -112,12 +141,17 @@ func (m *Modem) GetNetworkStatus() (NetworkStatus, error) {
 	}
 
 	// Парсим ответ вида +CREG: 0,1
-	if strings.Contains(resp, "+CREG:") {
-		parts := strings.Split(resp, ":")
-		if len(parts) >= 2 {
-			values := strings.Split(strings.TrimSpace(parts[1]), ",")
-			if len(values) >= 2 {
-				status, err := strconv.Atoi(strings.TrimSpace(values[1]))
+	lines := strings.Split(resp, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "+CREG:") {
+			// Убираем префикс "+CREG: "
+			data := strings.TrimSpace(line[6:])
+			// Разделяем по запятой
+			parts := strings.Split(data, ",")
+			if len(parts) >= 2 {
+				// Второй параметр - статус регистрации
+				status, err := strconv.Atoi(strings.TrimSpace(parts[1]))
 				if err == nil {
 					return NetworkStatus(status), nil
 				}
@@ -135,12 +169,14 @@ func (m *Modem) GetGPRSStatus() (NetworkStatus, error) {
 	}
 
 	// Парсим ответ вида +CGREG: 0,1
-	if strings.Contains(resp, "+CGREG:") {
-		parts := strings.Split(resp, ":")
-		if len(parts) >= 2 {
-			values := strings.Split(strings.TrimSpace(parts[1]), ",")
-			if len(values) >= 2 {
-				status, err := strconv.Atoi(strings.TrimSpace(values[1]))
+	lines := strings.Split(resp, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "+CGREG:") {
+			data := strings.TrimSpace(line[7:])
+			parts := strings.Split(data, ",")
+			if len(parts) >= 2 {
+				status, err := strconv.Atoi(strings.TrimSpace(parts[1]))
 				if err == nil {
 					return NetworkStatus(status), nil
 				}
@@ -158,13 +194,21 @@ func (m *Modem) GetCurrentOperator() (*OperatorInfo, error) {
 	}
 
 	// Парсим ответ вида +COPS: 0,0,"MegaFon",2
-	if strings.Contains(resp, "+COPS:") {
-		parts := strings.Split(resp, ":")
-		if len(parts) >= 2 {
-			values := strings.Split(strings.TrimSpace(parts[1]), ",")
-			if len(values) >= 3 {
+	lines := strings.Split(resp, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "+COPS:") {
+			// Убираем префикс "+COPS: "
+			data := strings.TrimSpace(line[6:])
+			// Разделяем по запятой, учитывая кавычки
+			parts := strings.Split(data, ",")
+			if len(parts) >= 3 {
 				operator := &OperatorInfo{
-					LongName: strings.Trim(values[2], "\""),
+					LongName: strings.Trim(parts[2], "\""),
+				}
+				// Если есть числовой код
+				if len(parts) >= 4 {
+					operator.Numeric = strings.Trim(parts[3], "\"")
 				}
 				return operator, nil
 			}
@@ -237,13 +281,17 @@ func (m *Modem) GetSignalQuality() (*SignalQuality, error) {
 	}
 
 	// Парсим ответ вида +CSQ: 20,0
-	if strings.Contains(resp, "+CSQ:") {
-		parts := strings.Split(resp, ":")
-		if len(parts) >= 2 {
-			values := strings.Split(strings.TrimSpace(parts[1]), ",")
-			if len(values) >= 2 {
-				rssi, err1 := strconv.Atoi(strings.TrimSpace(values[0]))
-				ber, err2 := strconv.Atoi(strings.TrimSpace(values[1]))
+	lines := strings.Split(resp, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "+CSQ:") {
+			// Убираем префикс "+CSQ: "
+			data := strings.TrimSpace(line[5:])
+			// Разделяем по запятой
+			parts := strings.Split(data, ",")
+			if len(parts) >= 2 {
+				rssi, err1 := strconv.Atoi(strings.TrimSpace(parts[0]))
+				ber, err2 := strconv.Atoi(strings.TrimSpace(parts[1]))
 				if err1 == nil && err2 == nil {
 					return &SignalQuality{
 						RSSI: rssi,
@@ -264,11 +312,12 @@ func (m *Modem) GetSIMStatus() (PinStatus, error) {
 	}
 
 	// Парсим ответ вида +CPIN: READY
-	if strings.Contains(resp, "+CPIN:") {
-		parts := strings.Split(resp, ":")
-		if len(parts) >= 2 {
-			status := strings.TrimSpace(parts[1])
-			status = strings.Split(status, "\n")[0] // Убираем OK
+	lines := strings.Split(resp, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "+CPIN:") {
+			// Убираем префикс "+CPIN: "
+			status := strings.TrimSpace(line[6:])
 			return PinStatus(status), nil
 		}
 	}
@@ -346,11 +395,12 @@ func (m *Modem) GetModemMode() (ModemMode, error) {
 	}
 
 	// Парсим ответ вида +CFUN: 1
-	if strings.Contains(resp, "+CFUN:") {
-		parts := strings.Split(resp, ":")
-		if len(parts) >= 2 {
-			modeStr := strings.TrimSpace(parts[1])
-			modeStr = strings.Split(modeStr, "\n")[0] // Убираем OK
+	lines := strings.Split(resp, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "+CFUN:") {
+			// Убираем префикс "+CFUN: "
+			modeStr := strings.TrimSpace(line[6:])
 			mode, err := strconv.Atoi(modeStr)
 			if err == nil {
 				switch mode {
